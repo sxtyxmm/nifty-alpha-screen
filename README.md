@@ -32,7 +32,9 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the stock screener:
+### Quick Start
+
+Run the stock screener with live market data:
 ```bash
 python stock_screener.py
 ```
@@ -43,6 +45,33 @@ The script will:
 3. Generate two CSV files with results:
    - `strategy1_momentum_retracement.csv` - Top 20 momentum stocks
    - `strategy2_ema_retracement.csv` - EMA retracement opportunities
+
+### Test Mode (Demo with Sample Data)
+
+If you want to test the tool without fetching live data:
+```bash
+python test_screener.py
+```
+
+This will generate sample data and demonstrate the strategies.
+
+### Programmatic Usage
+
+Use the screener in your own Python code:
+```bash
+python example_usage.py
+```
+
+Or import the modules directly:
+```python
+from stock_screener import StockDataFetcher, Strategy1, Strategy2
+
+fetcher = StockDataFetcher(stock_universe='nifty200')
+strategy1 = Strategy1(fetcher)
+results = strategy1.run()
+```
+
+See `example_usage.py` for more detailed examples.
 
 ## Strategy Details
 
@@ -101,6 +130,28 @@ Both strategies output CSV files with the following information:
 - Data is fetched in real-time during market hours
 - Processing time depends on network speed and market data availability
 - Stocks with insufficient data are automatically filtered out
+- CSV files are automatically ignored by git (see `.gitignore`)
+
+## Limitations & Future Enhancements
+
+**Current Limitations:**
+- Relies on Yahoo Finance API which may have rate limits or access restrictions
+- Stock list is hardcoded (top Nifty 200 stocks)
+- No automatic rebalancing or tracking over time
+- Single-threaded data fetching (can be slow for large universes)
+
+**Potential Enhancements:**
+- Add support for fetching official Nifty 200/500 lists from NSE
+- Implement parallel data fetching for faster processing
+- Add backtesting capabilities to validate strategy performance
+- Create a web dashboard for visualization
+- Add email/notification alerts for strategy triggers
+- Support for custom stock universes and sectors
+- Historical tracking and performance monitoring
+
+## Contributing
+
+Feel free to submit issues or pull requests to improve the tool!
 
 ## License
 
