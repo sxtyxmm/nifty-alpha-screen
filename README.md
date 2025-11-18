@@ -1,129 +1,334 @@
-# nifty-alpha-screen
+# 📈 NSE Stock Analysis System
 
-Quant-based stock analyzer for Indian markets that provides comprehensive investment recommendations based on fundamentals, technical indicators (EMA-44), and NSE delivery data.
+**Complete Automated Stock Analysis System for Indian Markets**
 
-## Features
+A comprehensive, production-ready platform that automatically analyzes ALL NSE stocks using fundamentals, technical indicators (EMA-44), and delivery data to provide actionable BUY/HOLD/AVOID signals.
 
-- **Fundamental Analysis**: Fetches key metrics including Market Cap, P/E ratios, Price to Book, Debt to Equity, ROE, and Beta
-- **Technical Analysis**: Calculates EMA-44 and analyzes price position and trend
-- **Delivery Data Analysis**: Parses NSE bhavcopy data to assess genuine accumulation
-- **Smart Scoring**: Combines all signals into a final INVEST/HOLD/AVOID recommendation
-- **Comprehensive Reports**: Presents data in easy-to-read tables with clear explanations
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Status](https://img.shields.io/badge/Status-Production-success.svg)
 
-## Installation
+## 🚀 Features
 
-1. Clone the repository:
+### Automated Data Pipeline
+- **Auto-fetch ALL NSE stocks** from official sources
+- **Parallel processing** for fast data retrieval
+- **Comprehensive fundamentals**: Market Cap, P/E, ROE, D/E, Beta, and more
+- **Technical analysis**: EMA-44, slope calculation, trend detection
+- **NSE delivery data**: Auto-download daily bhavcopy with 3-day trend analysis
+
+### Advanced Scoring System
+Score range: **-5 to +5** based on:
+- ✅ EMA trend and position (0 to +2)
+- ✅ EMA slope momentum (-1 to +1)
+- ✅ Fundamental strength (-2 to +2)
+- ✅ Delivery percentage (0 to +2)
+- ✅ Delivery trend (0 or +1)
+
+### Decision Signals
+- **BUY**: Score ≥ 3 (High conviction opportunities)
+- **HOLD**: Score 1-2 (Monitor positions)
+- **AVOID**: Score ≤ 0 (Stay away)
+
+### Interactive Streamlit Dashboard
+- 📊 **Real-time stock rankings** with sortable tables
+- 📈 **Interactive charts** (Price vs EMA-44, Delivery trends)
+- 🔍 **Stock search** and filtering
+- 📥 **Export to CSV/Excel**
+- ⚙️ **Customizable filters** (sector, signal type, score range)
+- 🎨 **Professional UI** with color-coded signals
+
+### Command Line Interface
+- Fast single-stock analysis
+- Batch analysis of multiple stocks
+- Full NSE scan with top opportunities
+- Export capabilities
+
+## 📦 Installation
+
+### Quick Start
+
 ```bash
+# Clone repository
 git clone https://github.com/sxtyxmm/nifty-alpha-screen.git
 cd nifty-alpha-screen
-```
 
-2. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Usage
+### Requirements
 
-### Basic Usage (without delivery data)
+- Python 3.10+
+- Internet connection (for data fetching)
+- 2GB+ RAM recommended
+
+## 🎯 Usage
+
+### Streamlit Dashboard (Recommended)
 
 ```bash
-python stock_analyzer.py RELIANCE
+streamlit run dashboard.py
 ```
 
-### With Delivery Data
+Then open your browser to `http://localhost:8501`
 
+**Dashboard Features:**
+- View all stocks with comprehensive rankings
+- Filter by signal type (BUY/HOLD/AVOID)
+- Analyze individual stocks in detail
+- Interactive charts and visualizations
+- Export results to CSV/Excel
+- Real-time data refresh
+
+### Command Line Interface
+
+#### Analyze Single Stock
 ```bash
-python stock_analyzer.py RELIANCE sample_bhavcopy.csv
+python cli.py --symbol RELIANCE
 ```
 
-### Examples
-
-Analyze Reliance Industries:
+#### Scan All NSE Stocks
 ```bash
-python stock_analyzer.py RELIANCE.NS
+python cli.py --scan --top 30
 ```
 
-Analyze TCS with delivery data:
+#### Analyze Multiple Stocks
 ```bash
-python stock_analyzer.py TCS /path/to/bhavcopy.csv
+python cli.py --symbols RELIANCE TCS INFY HDFCBANK
 ```
 
-## Output Format
+#### Fast Mode (Skip Delivery Data)
+```bash
+python cli.py --symbol RELIANCE --no-delivery
+```
 
-The analyzer provides a comprehensive report with:
+### Python API
 
-1. **Key Fundamentals Table**: Market Cap, P/E, P/B, D/E, ROE, Beta
-2. **EMA-44 Trend Analysis**: Current position vs EMA, slope, trend direction
-3. **NSE Delivery Data**: Deliverable quantity, percentage, and 3-day trend
-4. **Fundamental Grade**: A-D rating based on key metrics
-5. **Final Verdict**: INVEST/HOLD/AVOID with score (-2 to +3) and confidence level
+```python
+from data_pipeline import StockDataPipeline
 
-## Scoring Methodology
+# Create pipeline
+pipeline = StockDataPipeline()
 
-The analyzer uses a multi-factor scoring system:
+# Fetch all data
+df = pipeline.fetch_all_data(use_delivery=True)
 
-- **Price vs EMA-44**: +1 if above (bullish), -1 if below (bearish)
-- **EMA Slope**: +1 if rising >1%, -1 if falling <-1%
-- **Delivery %**: +1 if >35% (high accumulation)
-- **P/E Ratio**: +0.5 if reasonable (<25), -0.5 if high (>40)
-- **ROE**: +0.5 if >15%, -0.5 if negative
+# Get top BUY signals
+top_buys = pipeline.get_top_buys(n=20)
 
-**Final Score Range**: -2.0 to +3.0
+# Export results
+pipeline.export_to_excel('analysis.xlsx')
+```
 
-**Verdict Mapping**:
-- Score ≥ 2.0: INVEST (High Confidence)
-- Score ≥ 1.0: INVEST (Moderate Confidence)
-- Score ≥ 0.0: HOLD (Moderate Confidence)
-- Score ≥ -1.0: AVOID (Moderate Confidence)
-- Score < -1.0: AVOID (High Confidence)
+## 📊 Data Sources
 
-## NSE Delivery Data
+### Stock Symbols
+- NSE official API
+- NSE equity list
+- Fallback to curated Nifty 50 + popular stocks
 
-To include delivery data analysis, provide a bhavcopy CSV file with the following columns:
-- `SYMBOL`: Stock symbol
-- `TTL_TRD_QNTY`: Total traded quantity
-- `DELIV_QTY`: Deliverable quantity
-- `DELIV_PER`: Delivery percentage (optional, will be calculated)
+### Fundamentals
+- **Source**: Yahoo Finance (`yfinance`)
+- **Metrics**: Market Cap, P/E, P/B, ROE, D/E, Beta
+- **Frequency**: Real-time
 
-You can download bhavcopy files from NSE India's website.
+### Price Data
+- **Source**: Yahoo Finance
+- **Period**: Last 1 year
+- **Indicators**: EMA-44, slope analysis
 
-### Sample Bhavcopy Format
+### Delivery Data
+- **Source**: NSE Bhavcopy (archives.nseindia.com)
+- **Format**: Daily CSV files
+- **Metrics**: Delivery quantity, percentage, trends
 
-A sample bhavcopy file (`sample_bhavcopy.csv`) is included in the repository for reference.
+## 🎓 Scoring Methodology
 
-## Requirements
+### Component Breakdown
 
-- Python 3.8+
-- yfinance
-- pandas
-- numpy
-- tabulate
+1. **EMA Trend (0 to +2)**
+   - Price >5% above EMA-44: +2
+   - Price above EMA-44: +1
+   - Price below EMA-44: 0
 
-## How It Works
+2. **EMA Slope (-1 to +1)**
+   - Rising >2% (5-day): +1
+   - Flat: 0
+   - Falling <-2%: -1
 
-1. **Data Collection**: Fetches real-time fundamentals from Yahoo Finance
-2. **EMA Calculation**: Computes 44-day exponential moving average on adjusted close prices
-3. **Trend Analysis**: Evaluates EMA slope over 5 days to confirm trend strength
-4. **Delivery Analysis**: Parses NSE bhavcopy to assess institutional interest
-5. **Smart Scoring**: Combines technical, fundamental, and delivery signals
-6. **Recommendation**: Provides actionable INVEST/HOLD/AVOID verdict with reasoning
+3. **Fundamentals (-2 to +2)**
+   - P/E: <20 (+1), >40 (-1)
+   - ROE: >15% (+1), <0% (-1)
+   - Debt: <0.5 (+0.5), >2 (-0.5)
 
-## Limitations
+4. **Delivery % (0 to +2)**
+   - >50%: +2
+   - >35%: +1
+   - Otherwise: 0
 
-- Relies on Yahoo Finance data availability
-- NSE delivery data requires manual CSV input
-- Forward P/E may not be available for all stocks
-- Historical data limited to what Yahoo Finance provides
+5. **Delivery Trend (0 or +1)**
+   - Rising 3-day trend: +1
+   - Otherwise: 0
 
-## Contributing
+### Example Score Calculation
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+**RELIANCE**:
+- Price 3% above EMA-44: +1
+- EMA slope +3% (rising): +1
+- P/E 18 (good): +1, ROE 12% (ok): 0, D/E 0.3 (low): +0.5
+- Delivery 42%: +1
+- Delivery rising: +1
+- **Total: 5.5 → Capped at 5.0 → BUY**
 
-## License
+## 📁 Project Structure
 
-MIT License - feel free to use this tool for your investment research.
+```
+nifty-alpha-screen/
+├── dashboard.py              # Streamlit dashboard
+├── cli.py                    # Command-line interface
+├── data_pipeline.py          # Main data processing pipeline
+├── nse_data_fetcher.py       # NSE data fetching utilities
+├── stock_analyzer.py         # Original single-stock analyzer
+├── requirements.txt          # Python dependencies
+├── sample_bhavcopy.csv       # Sample delivery data
+├── README.md                 # This file
+├── DEPLOYMENT.md             # Deployment guide
+└── .gitignore               # Git ignore rules
+```
 
-## Disclaimer
+## 🚀 Deployment
 
-This tool is for educational and informational purposes only. It does not constitute financial advice. Always do your own research and consult with a qualified financial advisor before making investment decisions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions including:
+
+- **Streamlit Cloud** (Free, recommended)
+- **Railway.app** ($5/month free credit)
+- **Render.com** (Free tier with limitations)
+- **Docker** (Self-hosted)
+- **Heroku** ($7/month minimum)
+
+### Quick Deploy to Streamlit Cloud
+
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Deploy with main file: `dashboard.py`
+4. Done! ✅
+
+## ⚙️ Configuration
+
+### Performance Tuning
+
+Edit `data_pipeline.py` to adjust:
+
+```python
+# Number of parallel workers
+max_workers = 10  # Reduce for slower connections
+
+# Cache duration (seconds)
+CACHE_TTL = 3600  # 1 hour
+```
+
+### Data Limits
+
+In the dashboard, use sidebar controls to:
+- Limit number of stocks analyzed (10-500)
+- Enable/disable delivery data fetching
+- Adjust cache settings
+
+## 🔧 Advanced Features
+
+### Caching
+- All data fetching is cached for 1 hour
+- Reduces API calls and improves performance
+- Configurable cache TTL
+
+### Error Handling
+- Graceful fallback if NSE APIs fail
+- Continues processing even if individual stocks fail
+- Comprehensive logging
+
+### Export Capabilities
+- CSV export with all metrics
+- Excel export with multiple sheets
+- Timestamped filenames
+
+## 📈 Example Output
+
+### Dashboard View
+```
+Symbol  | Company         | Price  | EMA     | Slope  | Deliv% | Score | Signal
+--------|-----------------|--------|---------|--------|--------|-------|-------
+RELIANCE| Reliance Ind.   | 2461.0 | ABOVE   | +2.3%  | 42.0%  | 5.0   | BUY
+TCS     | TCS Ltd         | 3510.5 | ABOVE   | +1.8%  | 42.5%  | 4.5   | BUY
+INFY    | Infosys Ltd     | 1460.0 | ABOVE   | +0.9%  | 40.0%  | 3.0   | BUY
+```
+
+### CLI Output
+```
+🎯 FINAL VERDICT
+================================================================================
+🚀 Signal: BUY
+Score: 5.0 / 5.0
+================================================================================
+```
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## ⚠️ Disclaimer
+
+**This tool is for educational and informational purposes only.**
+
+- NOT financial advice
+- Do your own research (DYOR)
+- Consult a qualified financial advisor
+- Past performance doesn't guarantee future results
+- Markets are inherently risky
+
+## 📄 License
+
+MIT License - Free to use, modify, and distribute.
+
+## 🔗 Links
+
+- **Repository**: [github.com/sxtyxmm/nifty-alpha-screen](https://github.com/sxtyxmm/nifty-alpha-screen)
+- **Issues**: [Report bugs or request features](https://github.com/sxtyxmm/nifty-alpha-screen/issues)
+- **Discussions**: [Ask questions](https://github.com/sxtyxmm/nifty-alpha-screen/discussions)
+
+## 🙏 Acknowledgments
+
+- **Yahoo Finance** for fundamental and price data
+- **NSE India** for delivery data
+- **Streamlit** for the amazing dashboard framework
+- **yfinance** library maintainers
+
+## 📞 Support
+
+Having issues? Try:
+
+1. Check the [Deployment Guide](DEPLOYMENT.md)
+2. Review [GitHub Issues](https://github.com/sxtyxmm/nifty-alpha-screen/issues)
+3. Run with `--no-delivery` flag for faster/simpler analysis
+4. Reduce number of stocks analyzed
+
+## 🎉 Features Coming Soon
+
+- [ ] Real-time alerts for BUY signals
+- [ ] Backtesting capabilities
+- [ ] Portfolio tracking
+- [ ] WhatsApp/Telegram notifications
+- [ ] Mobile app
+- [ ] Options data integration
+- [ ] Sector rotation analysis
+
+---
+
+**Made with ❤️ for the Indian trading community**
+
+**Star ⭐ this repo if you find it useful!**
