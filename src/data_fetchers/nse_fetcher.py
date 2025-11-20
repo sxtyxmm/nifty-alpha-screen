@@ -12,132 +12,245 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 import time
 import json
+import os
+from pathlib import Path
 
 
 class NSEDataFetcher:
     """Fetch NSE stock symbols and delivery data."""
     
-    # NSE headers to mimic browser
+    # NSE headers to mimic browser - improved headers
     HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': 'https://www.nseindia.com/'
     }
+    
+    CACHE_FILE = "data/nse_symbols_cache.json"
+    CACHE_TTL_HOURS = 24  # Cache validity: 24 hours
     
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update(self.HEADERS)
+        self._cookies_initialized = False
         self._initialize_session()
     
     def _initialize_session(self):
         """Initialize session by visiting NSE homepage to get cookies."""
         try:
-            self.session.get('https://www.nseindia.com', timeout=10)
-            time.sleep(1)  # Give time for cookies to set
-        except Exception as e:
-            print(f"Warning: Could not initialize NSE session: {e}")
+            # Visit homepage first
+            response = self.session.get('https://www.nseindia.com', timeout=10, allow_redirects=True)
+            time.sleep(2)  # Increased wait time for cookies
+            
+            # Visit a static page to ensure cookies are set
+            self.session.get('https://www.nseindia.com/market-data/live-equity-market', timeout=10)
+            time.sleep(1)
+            
+            self._cookies_initialized = True
+        except Exception:
+            # Silently continue - will use fallback if APIs fail
+            pass
     
-    def fetch_all_nse_symbols(self) -> List[str]:
+    def fetch_all_nse_symbols(self, silent: bool = False, force_refresh: bool = False) -> List[str]:
         """
-        Fetch all NSE equity symbols.
+        Fetch all NSE equity symbols with intelligent caching.
+        
+        Args:
+            silent: If True, suppress error messages
+            force_refresh: If True, bypass cache and fetch fresh data
         
         Returns:
             List of stock symbols
         """
+        # Try loading from cache first (unless force refresh)
+        if not force_refresh:
+            cached_symbols = self._load_from_cache(silent)
+            if cached_symbols:
+                return cached_symbols
+        
+        # Cache miss or force refresh - fetch from NSE
         symbols = []
         
         # Method 1: Try fetching from NSE equity list
         try:
             symbols = self._fetch_from_equity_list()
             if symbols:
-                print(f"✓ Fetched {len(symbols)} symbols from NSE equity list")
+                if not silent:
+                    print(f"✓ Fetched {len(symbols)} symbols from NSE equity list")
+                self._save_to_cache(symbols)
                 return symbols
         except Exception as e:
-            print(f"Method 1 failed: {e}")
+            if not silent:
+                # Only show a simplified message
+                pass
         
         # Method 2: Try fetching from market data
         try:
             symbols = self._fetch_from_market_data()
             if symbols:
-                print(f"✓ Fetched {len(symbols)} symbols from NSE market data")
+                if not silent:
+                    print(f"✓ Fetched {len(symbols)} symbols from NSE market data")
+                self._save_to_cache(symbols)
                 return symbols
         except Exception as e:
-            print(f"Method 2 failed: {e}")
+            if not silent:
+                pass
         
-        # Method 3: Fallback to hardcoded popular stocks
-        print("⚠️  Using fallback list of popular NSE stocks")
-        symbols = self._get_fallback_symbols()
+        # Method 3: Try loading old cache regardless of age (offline fallback)
+        if not force_refresh:
+            cached_symbols = self._load_from_cache(silent, ignore_ttl=True)
+            if cached_symbols:
+                if not silent:
+                    print(f"⚠️  NSE unreachable - using cached symbols ({len(cached_symbols)} stocks)")
+                return cached_symbols
         
-        return symbols
+        # Method 4: All methods failed and no cache available
+        if not silent:
+            print("❌ Unable to fetch NSE symbols (no network and no cache)")
+            print("💡 Run with internet once to populate cache")
+        
+        return []
     
-    def _fetch_from_equity_list(self) -> List[str]:
-        """Fetch symbols from NSE equity list API."""
-        url = "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
+    def _load_from_cache(self, silent: bool = False, ignore_ttl: bool = False) -> Optional[List[str]]:
+        """
+        Load symbols from cache file if valid.
         
+        Args:
+            silent: If True, suppress messages
+            ignore_ttl: If True, load cache regardless of age (offline mode)
+        
+        Returns:
+            List of symbols or None if cache invalid
+        """
         try:
-            response = self.session.get(url, timeout=15)
-            response.raise_for_status()
-            data = response.json()
+            if not os.path.exists(self.CACHE_FILE):
+                return None
             
-            symbols = []
-            if 'data' in data:
-                for item in data['data']:
-                    if 'symbol' in item:
-                        symbols.append(item['symbol'])
+            with open(self.CACHE_FILE, 'r') as f:
+                cache_data = json.load(f)
+            
+            # Validate cache structure
+            if 'symbols' not in cache_data or 'last_updated' not in cache_data:
+                return None
+            
+            # Check cache age
+            if not ignore_ttl:
+                last_updated = datetime.fromisoformat(cache_data['last_updated'])
+                age_hours = (datetime.now() - last_updated).total_seconds() / 3600
+                
+                if age_hours > self.CACHE_TTL_HOURS:
+                    if not silent:
+                        print(f"ℹ️  Cache expired ({age_hours:.1f}h old, refreshing...)")
+                    return None
+            
+            symbols = cache_data['symbols']
+            if not silent:
+                age_hours = (datetime.now() - datetime.fromisoformat(cache_data['last_updated'])).total_seconds() / 3600
+                print(f"✓ Loaded {len(symbols)} symbols from cache ({age_hours:.1f}h old)")
             
             return symbols
+            
         except Exception as e:
-            raise Exception(f"Failed to fetch from equity list: {e}")
+            if not silent:
+                print(f"⚠️  Cache load failed: {str(e)}")
+            return None
     
-    def _fetch_from_market_data(self) -> List[str]:
-        """Fetch symbols from NSE market data."""
-        url = "https://www.nseindia.com/api/allIndices"
+    def _save_to_cache(self, symbols: List[str]) -> None:
+        """
+        Save symbols to cache file.
+        
+        Args:
+            symbols: List of symbols to cache
+        """
+        try:
+            # Create data directory if needed
+            os.makedirs(os.path.dirname(self.CACHE_FILE), exist_ok=True)
+            
+            cache_data = {
+                'last_updated': datetime.now().isoformat(),
+                'symbols': symbols,
+                'count': len(symbols),
+                'source': 'NSE API'
+            }
+            
+            with open(self.CACHE_FILE, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+                
+        except Exception as e:
+            # Silently fail - caching is optional
+            pass
+    
+    def _fetch_from_equity_list(self) -> List[str]:
+        """Fetch symbols from NSE official equity CSV (most reliable method)."""
+        url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
         
         try:
             response = self.session.get(url, timeout=15)
             response.raise_for_status()
-            data = response.json()
             
+            # Parse CSV
+            lines = response.text.strip().split('\n')
+            
+            if len(lines) < 2:
+                raise Exception("Empty or invalid CSV response")
+            
+            symbols = []
+            for line in lines[1:]:  # Skip header
+                parts = line.split(',')
+                if len(parts) > 0 and parts[0].strip():
+                    symbol = parts[0].strip()
+                    # Filter out special characters and ensure valid trading symbols
+                    if symbol and symbol.replace('&', '').replace('-', '').isalnum():
+                        symbols.append(symbol)
+            
+            if not symbols:
+                raise Exception("No symbols found in CSV")
+            
+            return symbols
+            
+        except Exception as e:
+            raise Exception(f"Failed to fetch from equity CSV: {str(e)}")
+    
+    def _fetch_from_market_data(self) -> List[str]:
+        """Fetch symbols from NSE derivative (F&O) list CSV."""
+        url = "https://www.nseindia.com/api/master-quote"
+        
+        try:
+            # Reinitialize session if needed
+            if not self._cookies_initialized:
+                self._initialize_session()
+                
+            response = self.session.get(url, timeout=15, allow_redirects=True)
+            response.raise_for_status()
+            
+            data = response.json()
             symbols = set()
-            if 'data' in data:
+            
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and 'symbol' in item:
+                        symbol = item['symbol']
+                        if symbol and symbol not in ['NIFTY', 'BANKNIFTY', 'NIFTY 50', 'NIFTY BANK']:
+                            symbols.add(symbol)
+            elif isinstance(data, dict) and 'data' in data:
                 for item in data['data']:
-                    if 'symbol' in item and item['symbol'] not in ['NIFTY 50', 'NIFTY BANK']:
-                        symbols.add(item['symbol'])
+                    if 'symbol' in item:
+                        symbol = item['symbol']
+                        if symbol and symbol not in ['NIFTY', 'BANKNIFTY', 'NIFTY 50', 'NIFTY BANK']:
+                            symbols.add(symbol)
+            
+            if not symbols:
+                raise Exception("No symbols found in response")
             
             return list(symbols)
-        except Exception as e:
-            raise Exception(f"Failed to fetch from market data: {e}")
-    
-    def _get_fallback_symbols(self) -> List[str]:
-        """Return a curated list of popular NSE stocks as fallback."""
-        return [
-            # Nifty 50 stocks
-            'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-            'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK',
-            'LT', 'BAJFINANCE', 'ASIANPAINT', 'AXISBANK', 'MARUTI',
-            'HCLTECH', 'WIPRO', 'TITAN', 'ULTRACEMCO', 'NESTLEIND',
-            'SUNPHARMA', 'BAJAJFINSV', 'ADANIENT', 'ONGC', 'NTPC',
-            'TATAMOTORS', 'POWERGRID', 'TATASTEEL', 'M&M', 'TECHM',
-            'COALINDIA', 'JSWSTEEL', 'INDUSINDBK', 'DRREDDY', 'GRASIM',
-            'BRITANNIA', 'APOLLOHOSP', 'ADANIPORTS', 'CIPLA', 'DIVISLAB',
-            'EICHERMOT', 'BPCL', 'HINDALCO', 'SHREECEM', 'HEROMOTOCO',
-            'BAJAJ-AUTO', 'TATACONSUM', 'UPL', 'SBILIFE', 'HDFCLIFE',
             
-            # Additional popular stocks
-            'VEDL', 'SAIL', 'ZEEL', 'DLF', 'GODREJCP',
-            'PIDILITIND', 'MUTHOOTFIN', 'ADANIPOWER', 'TATAPOWER', 'PNB',
-            'BANKBARODA', 'CANBK', 'IOC', 'CHOLAFIN', 'RECLTD',
-            'PFC', 'IRCTC', 'ADANIGREEN', 'PAGEIND', 'HAVELLS',
-            'BOSCHLTD', 'ABB', 'SIEMENS', 'TORNTPHARM', 'LUPIN',
-            'AUROPHARMA', 'BIOCON', 'CADILAHC', 'GLENMARK', 'ALKEM',
-            'IBULHSGFIN', 'LICHSGFIN', 'M&MFIN', 'BANDHANBNK', 'IDFCFIRSTB',
-            'RBLBANK', 'FEDERALBNK', 'IDFC', 'INDUSTOWER', 'BHARATFORG',
-            'VOLTAS', 'NMDC', 'AMBUJACEM', 'ACC', 'GAIL',
-            'PETRONET', 'INDIGO', 'DABUR', 'MARICO', 'COLPAL',
-        ]
+        except Exception as e:
+            raise Exception(f"Failed to fetch from market data: {str(e)}")
+    
     
     def fetch_bhavcopy(self, date: Optional[datetime] = None) -> Optional[pd.DataFrame]:
         """

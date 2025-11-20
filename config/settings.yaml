@@ -1,0 +1,108 @@
+# NSE Stock Analysis System Configuration
+
+# Application Settings
+app:
+  name: "NSE Stock Analysis System"
+  version: "2.0.0"
+  environment: "production"
+
+# Data Fetching Settings
+data_fetching:
+  max_workers: 10  # Parallel workers for data fetching
+  timeout: 30  # Request timeout in seconds
+  retry_attempts: 3
+  retry_delay: 2  # Base delay in seconds (exponential backoff)
+  cache_ttl: 3600  # Cache time-to-live in seconds (1 hour)
+  
+# Stock Universe Settings
+stock_universe:
+  min_market_cap: 0  # Minimum market cap in crores (0 = no limit)
+  max_stocks: 500  # Maximum number of stocks to analyze
+  include_indices:
+    - "NIFTY50"
+    - "NIFTY100"
+    - "NIFTY200"
+    - "NIFTY500"
+    - "NIFTYMIDCAP100"
+    - "NIFTYSMALLCAP100"
+
+# Technical Analysis Settings
+technical_analysis:
+  # Multi-timeframe EMA periods
+  daily_ema_period: 252   # 1 year of daily data (~252 trading days)
+  weekly_ema_period: 260  # 5 years of weekly data (~260 weeks)
+  
+  # Historical data requirements
+  price_history_days: 1825  # Days of historical price data needed (~5 years for weekly EMA)
+
+# Fundamental Analysis Settings
+fundamental_analysis:
+  thresholds:
+    pe_ratio:
+      low: 20  # Good P/E ratio
+      high: 40  # High P/E ratio
+    roe:
+      good: 15  # Good ROE percentage
+      poor: 0  # Poor ROE threshold
+    debt_equity:
+      low: 0.5  # Low debt ratio
+      high: 2.0  # High debt ratio
+    pb_ratio:
+      low: 1.5  # Low P/B ratio
+      high: 5.0  # High P/B ratio
+
+# Delivery Data Settings
+delivery_data:
+  enabled: true
+  days_to_analyze: 3  # Days for trend analysis
+  
+  thresholds:
+    high_delivery: 50  # High delivery percentage
+    medium_delivery: 35  # Medium delivery percentage
+    trend_significance: 5  # Minimum % change for trend
+
+# Scoring Settings
+scoring:
+  weights:
+    technical: 0.40  # 40% weight
+    fundamental: 0.30  # 30% weight
+    delivery: 0.30  # 30% weight
+  
+  ranges:
+    min_score: -5
+    max_score: 5
+  
+  signals:
+    buy_threshold: 3.0  # Score >= 3 = BUY
+    hold_min: 1.0  # Score 1-2 = HOLD
+    hold_max: 2.9
+
+# Export Settings
+export:
+  default_format: "csv"
+  timestamp_format: "%Y%m%d_%H%M%S"
+  output_directory: "data/exports"
+  include_metadata: true
+
+# Logging Settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "logs/nse_analysis.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  console_output: true
+
+# Dashboard Settings
+dashboard:
+  title: "NSE Stock Analysis Dashboard"
+  port: 8501
+  default_page_size: 50
+  auto_refresh: false
+  refresh_interval: 300  # seconds
+
+# API Rate Limiting
+rate_limiting:
+  enabled: true
+  requests_per_minute: 30
+  requests_per_hour: 1000
